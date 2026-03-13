@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discord IP Grabber</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+            color: white;
+            text-align: center;
+        }
+        .container {
+            background: rgba(0, 0, 0, 0.7);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            max-width: 500px;
+            width: 90%;
+        }
+        h1 {
+            margin-top: 0;
+            font-size: 2.2rem;
+        }
+        .btn {
+            background: #7289da;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+            width: 100%;
+            font-weight: bold;
+        }
+        .btn:hover {
+            background: #5b6ed7;
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+        .btn:active {
+            transform: translateY(1px);
+        }
+        .loading {
+            display: none;
+            margin: 20px 0;
+        }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid #fff;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .result {
+            display: none;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        .instructions {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Discord IP Grabber</h1>
+        <p>Click below to capture your IP address and Discord username</p>
+        
+        <button id="grabButton" class="btn">Grab My Info</button>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Collecting information...</p>
+        </div>
+        
+        <div class="result" id="result">
+            <h2>Collected Information</h2>
+            <p><strong>Username:</strong> <span id="usernameDisplay"></span></p>
+            <p><strong>IP Address:</strong> <span id="ipDisplay"></span></p>
+            <p><strong>Timestamp:</strong> <span id="timestampDisplay"></span></p>
+        </div>
+        
+        <div class="instructions">
+            <p><strong>Note:</strong> Your data is stored in Cloudflare R2 storage and will be available for others to see.</p>
+        </div>
+    </div>
+
+    <script>
+        // Get IP address using a free service
+        async function getIPAddress() {
+            try {
+                const response = await fetch('https://api.ipify.org?format=json');
+                const data = await response.json();
+                return data.ip;
+            } catch (error) {
+                console.error('Error getting IP:', error);
+                return 'Unknown IP';
+            }
+        }
+
+        // Store data in Cloudflare R2
+        async function storeDataInR2(discordName, ipAddress, timestamp) {
+            try {
+                // Configuration - replace with your actual values
+                const BUCKET_NAME = 'discord-ip-data'; // Your R2 bucket name
+                const ACCOUNT_ID = '640846f3750d7515889506062e8fbdbf'; // Found in Cloudflare dashboard
+                const ACCESS_TOKEN = 'https://640846f3750d7515889506062e8fbdbf.r2.cloudflarestorage.com/discord-ip-data'; // From Workers or API tokens
+                
+                // Create unique filename (timestamp + discord name)
+                const filename = `${discordName}_${Date.now()}.json`;
+                
+                // Prepare data to store
+                const data = {
+                    discordName,
+                    ipAddress,
+                    timestamp,
+                    userAgent: navigator.userAgent,
+                    browser: navigator.appName,
+                    url: window.location.href
+                };
+                
+                // Store in R2 using Cloudflare Workers API
+                const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/r2/buckets/${BUCKET_NAME}/objects/${filename}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${ACCESS_TOKEN}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                if (response.ok) {
+                    console.log('Data stored successfully in R2');
+                    return true;
+                } else {
+                    throw new Error(`Failed to store data: ${response.status}`);
+                }
+            } catch (error) {
+                console.error('Error storing data in R2:', error);
+                // Fallback to localStorage if R2 fails
+                storeDataInLocalStorage(discordName, ipAddress, timestamp);
+                return false;
+            }
+        }
+
+        // Store data in localStorage as fallback
+        function storeDataInLocalStorage(discordName, ipAddress, timestamp) {
+            const data = {
+                discordName,
+                ipAddress,
+                timestamp
+            };
+            
+            const storedData = JSON.parse(localStorage.getItem('discordIPData') || '[]');
+            storedData.push(data);
+            localStorage.setItem('discordIPData', JSON.stringify(storedData));
+        }
+
+        // Get Discord username from URL parameter
+        function getDiscordUsername() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('discord') || 'Anonymous';
+        }
+
+        // Main function to collect and store data
+        async function grabInfo() {
+            const button = document.getElementById('grabButton');
+            const loading = document.getElementById('loading');
+            const result = document.getElementById('result');
+            
+            // Show loading
+            button.style.display = 'none';
+            loading.style.display = 'block';
+            
+            try {
+                // Get information
+                const discordName = getDiscordUsername();
+                const ipAddress = await getIPAddress();
+                const timestamp = new Date().toLocaleString();
+                
+                // Store data (try R2 first, fallback to localStorage)
+                await storeDataInR2(discordName, ipAddress, timestamp);
+                
+                // Display results
+                document.getElementById('usernameDisplay').textContent = discordName;
+                document.getElementById('ipDisplay').textContent = ipAddress;
+                document.getElementById('timestampDisplay').textContent = timestamp;
+                
+                result.style.display = 'block';
+            } catch (error) {
+                console.error('Error in grabInfo:', error);
+                alert('Error collecting information. Please try again.');
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            const button = document.getElementById('grabButton');
+            button.addEventListener('click', grabInfo);
+            
+            // Auto-grab if URL has discord parameter
+            const discordParam = getDiscordUsername();
+            if (discordParam && discordParam !== 'Anonymous') {
+                setTimeout(grabInfo, 1000); // Auto-run after 1 second
+            }
+        });
+    </script>
+</body>
+</html>
