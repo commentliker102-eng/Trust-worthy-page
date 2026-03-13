@@ -31,25 +31,6 @@ p {
     font-size: 1.1rem;
 }
 
-button {
-    background: #7289da;
-    color: white;
-    border: none;
-    padding: 15px 30px;
-    font-size: 1.2rem;
-    border-radius: 50px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    margin: 20px 0;
-    width: 100%;
-    font-weight: bold;
-}
-
-button:hover {
-    background: #5b6edc;
-    transform: translateY(-2px);
-}
-
 .result {
     background: rgba(255, 255, 255, 0.1);
     padding: 20px;
@@ -65,4 +46,10 @@ button:hover {
 
 .result p {
     margin: 10px 0;
+    font-size: 1rem;
+}
+
+.loading {
+    color: #7289da;
+    font-style: italic;
 }
