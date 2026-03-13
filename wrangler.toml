@@ -1,0 +1,7 @@
+name = "diagnostics-worker"
+main = "worker/index.js"
+compatibility_date = "2026-03-13"
+
+[[r2_buckets]]
+binding = "DIAG_BUCKET"
+bucket_name = "diagnostics-bucket"
