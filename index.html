@@ -1,19 +1,31 @@
-<!-- index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trust-worthy Page</title>
-    <link rel="stylesheet" href="css/style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Diagnostics Check</title>
+  <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
-    <div class="container">
-        <h1>Trust-worthy Verification</h1>
-        <p>Automatically storing your information...</p>
-        <div id="result" class="result"></div>
+  <div class="container">
+    <h1>Diagnostics Check</h1>
+    <p>
+      This page stores limited diagnostic and anti-bot signals after you choose to continue.
+      It stores a salted hash of your IP, browser/device details, and session metadata for troubleshooting.
+    </p>
+
+    <label>
+      <input type="checkbox" id="consent" />
+      I understand and consent to this diagnostic data being stored.
+    </label>
+
+    <div style="margin-top: 12px;">
+      <button id="startBtn">Continue</button>
     </div>
 
-    <script src="js/auto-trust.js"></script>
+    <div id="result" class="result" style="display:none; margin-top: 16px;"></div>
+  </div>
+
+  <script src="js/main.js"></script>
 </body>
 </html>
